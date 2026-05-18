@@ -1,4 +1,4 @@
-const Profissional = require("../models/Profissional");
+const Profissional = require("./Profissional");
 const bcrypt = require("bcryptjs");
 
 exports.criar = async (req, res) => {

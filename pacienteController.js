@@ -1,4 +1,4 @@
-const Paciente = require("../models/Paciente");
+const Paciente = require("./Paciente");
 
 exports.criar = async (req, res) => {
     try {
