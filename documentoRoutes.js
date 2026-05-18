@@ -1,6 +1,6 @@
 const router = require("express").Router();
-const controller = require("../controllers/documentoController");
-const auth = require("../middleware/auth");
+const controller = require("./documentoController");
+const auth = require("./auth");
 const multer = require("multer");
 
 // Configuração do multer para upload
