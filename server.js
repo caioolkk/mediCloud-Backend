@@ -59,10 +59,10 @@ app.get('/api/pacientes', async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
       return res.status(500).json({ success: false, message: 'MongoDB não conectado' });
     }
-    
+
     const { busca } = req.query;
     let filtro = {};
-    
+
     if (busca) {
       filtro = {
         $or: [
@@ -72,7 +72,7 @@ app.get('/api/pacientes', async (req, res) => {
         ]
       };
     }
-    
+
     const pacientes = await Paciente.find(filtro).sort({ createdAt: -1 });
     res.json({ success: true, data: pacientes });
   } catch (err) {
@@ -124,7 +124,168 @@ app.delete('/api/pacientes/:id', async (req, res) => {
   }
 });
 
+// Schema de Documento (adicione após o schema de Paciente)
+const documentoSchema = new mongoose.Schema({
+  pacienteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Paciente',
+    required: true
+  },
+  tipo: {
+    type: String,
+    enum: ['Prontuário', 'Exame', 'Receita', 'Outro'],
+    required: true
+  },
+  conteudo: String,
+  status: {
+    type: String,
+    enum: ['Ativo', 'Pendente', 'Arquivado'],
+    default: 'Ativo'
+  },
+  dataRegistro: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+const Documento = mongoose.models.Documento || mongoose.model('Documento', documentoSchema);
+
+// ============ ROTAS DE DOCUMENTOS ============
+
+// LISTAR documentos
+app.get('/api/documentos', async (req, res) => {
+  try {
+    console.log('📥 GET /api/documentos');
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ success: false, message: 'MongoDB não conectado' });
+    }
+
+    const { status, periodo, pacienteId } = req.query;
+    let filtro = {};
+
+    if (status) filtro.status = status;
+    if (pacienteId) filtro.pacienteId = pacienteId;
+
+    if (periodo) {
+      const dias = { '7': 7, '30': 30, '90': 90 }[periodo] || 7;
+      filtro.dataRegistro = {
+        $gte: new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+      };
+    }
+
+    const documentos = await Documento.find(filtro)
+      .populate('pacienteId', 'nome')
+      .sort({ dataRegistro: -1 });
+
+    console.log('✅ Encontrados:', documentos.length, 'documentos');
+    res.json({ success: true, data: documentos });
+
+  } catch (err) {
+    console.error('❌ Erro em GET /api/documentos:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar documentos',
+      error: err.message
+    });
+  }
+});
+
+// CRIAR documento
+app.post('/api/documentos', async (req, res) => {
+  try {
+    console.log('📥 POST /api/documentos', req.body);
+
+    const { pacienteId, tipo, conteudo, status } = req.body;
+
+    if (!pacienteId || !tipo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Paciente e tipo são obrigatórios'
+      });
+    }
+
+    const novoDocumento = new Documento({
+      pacienteId,
+      tipo,
+      conteudo: conteudo || '',
+      status: status || 'Ativo'
+    });
+
+    await novoDocumento.save();
+    console.log('✅ Documento criado:', novoDocumento._id);
+
+    res.status(201).json({
+      success: true,
+      data: novoDocumento
+    });
+
+  } catch (err) {
+    console.error('❌ Erro em POST /api/documentos:', err);
+    res.status(400).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+// BUSCAR documento por ID
+app.get('/api/documentos/:id', async (req, res) => {
+  try {
+    const documento = await Documento.findById(req.params.id)
+      .populate('pacienteId', 'nome');
+
+    if (!documento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento não encontrado'
+      });
+    }
+
+    res.json({ success: true, data: documento });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+// ATUALIZAR documento
+app.put('/api/documentos/:id', async (req, res) => {
+  try {
+    const { tipo, conteudo, status } = req.body;
+
+    const atualizado = await Documento.findByIdAndUpdate(
+      req.params.id,
+      { tipo, conteudo, status },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ success: true, data: atualizado });
+
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+// EXCLUIR documento
+app.delete('/api/documentos/:id', async (req, res) => {
+  try {
+    await Documento.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Documento removido' });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 // ============ INICIAR ============
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`🌐 API: https://medicloud-backend-wy7s.onrender.com`);
