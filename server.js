@@ -124,7 +124,7 @@ app.delete('/api/pacientes/:id', async (req, res) => {
   }
 });
 
-// Schema de Documento (adicione após o schema de Paciente)
+// Schema de Documento 
 const documentoSchema = new mongoose.Schema({
   pacienteId: {
     type: mongoose.Schema.Types.ObjectId,
